@@ -43,9 +43,9 @@ public class GetArticle {
 
     public static List<String> getColoumArticleNames(String directory,String zhuanlanDirectory) throws IOException, InterruptedException {
         System.out.println("----------正在爬取" +  zhuanlanDirectory + "下的文章");
-        Thread.sleep(21000);
         Connection connect = Jsoup.connect(directory + "/" + zhuanlanDirectory).timeout(30000);
         Document document = connect.get();
+        Thread.sleep(31000);
         //获取document中class为book-menu uncollapsible 的标签 的第二个子标签
         Elements elementsByClass = document.getElementsByClass("book-menu uncollapsible");
         Elements uncollapsible = elementsByClass.get(0).getElementsByClass("menu-item");
@@ -68,34 +68,67 @@ public class GetArticle {
      * @param zhuanlanDirectory 专栏名
      * @param fileName          文章名
      */
-    private static void getArticleAndPicturn(String directory, String zhuanlanDirectory, String fileName) throws IOException, InterruptedException {
+    private static void getArticleAndPicturn(String directory, String zhuanlanDirectory, String fileName) throws InterruptedException {
+        System.out.println("----------正在处理文章：" + fileName);
+        String filePath = "D:\\document\\爬取文件\\" + zhuanlanDirectory + "\\" + fileName;
 
-        System.out.println( "----------正在爬取" + fileName );
-        String file="D:\\document\\爬取文件/" + zhuanlanDirectory + "/" + fileName;
-        //如果文件已经存在，则直接返回
-        if(FileUtil.exist(file)){
+        // 如果文件已经存在，跳过文章抓取，进入图片检查
+        if (FileUtil.exist(filePath)) {
+            System.out.println("文章已存在，跳过抓取：" + fileName);
+            try {
+                checkAndDownloadImages(directory, zhuanlanDirectory, fileName);
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
             return;
         }
 
-        Thread.sleep(21000);
-        Document document = Jsoup.connect(directory + "/" + zhuanlanDirectory + "/" + fileName).get();
-        //获取document中class为book-post 的标签的所有子标签，并转为字符串
+        // 如果文章文件不存在，开始抓取文章内容
+        Document document = null;
+        try {
+            document = Jsoup.connect(directory + "/" + zhuanlanDirectory + "/" + fileName).get();
+        } catch (IOException e) {
+            System.out.println("抓取文章失败，跳过：" + fileName);
+            return;
+        }
+        Thread.sleep(31000);
+        if(document==null){
+            System.out.println("抓取文章失败，跳过：" + fileName);
+            return;
+        }
         String content = document.getElementsByClass("book-post").toString();
         String contentMD = htmlTansToMarkdown(content);
-        //网址的最后一个斜杠后的字符串为文件名，string类型的contentMD为文件内容，默认为UTF-8编码，放在resources文件夹中，使用hutool包完成这个功能
-        // 写入文件
-        FileUtil.writeString(contentMD, "D:\\document\\爬取文件/" + zhuanlanDirectory + "/" + fileName, CharsetUtil.UTF_8);
-        //写入图片
-        String[] assets = extractAssets(contentMD);
-        for (String asset : assets) {
-            //等待10秒，避免反爬虫
-            Thread.sleep(21000);
-            if(!"".equals(asset)){
-                downloadImage(directory + zhuanlanDirectory + "/" + asset, "D:\\document\\爬取文件/" + zhuanlanDirectory + "/assets", asset.substring(7, asset.length()));
-            }
+
+        // 写入文章内容到本地
+        FileUtil.writeString(contentMD, filePath, CharsetUtil.UTF_8);
+        System.out.println("文章抓取完成并保存：" + fileName);
+
+        // 处理文章中的图片
+        try {
+            checkAndDownloadImages(directory, zhuanlanDirectory, fileName);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+
         }
     }
+    private static void checkAndDownloadImages(String directory, String zhuanlanDirectory, String fileName) throws IOException, InterruptedException {
+        String filePath = "D:\\document\\爬取文件\\" + zhuanlanDirectory + "\\" + fileName;
+        String contentMD = FileUtil.readString(filePath, CharsetUtil.UTF_8);
 
+        // 提取Markdown中的图片链接
+        String[] assets = extractAssets(contentMD);
+        for (String asset : assets) {
+            if (!"".equals(asset)) {
+                String imagePath = "D:\\document\\爬取文件\\" + zhuanlanDirectory + "\\assets\\" + asset.substring(7);
+                // 检查图片是否已经存在
+                if (!FileUtil.exist(imagePath)) {
+                    // 如果图片不存在，则下载图片
+                    downloadImage(directory + zhuanlanDirectory + "/" + asset, "D:\\document\\爬取文件\\" + zhuanlanDirectory + "\\assets", asset.substring(7));
+                } else {
+                    System.out.println("图片已存在，跳过下载：" + asset);
+                }
+            }
+        }}
     public static String htmlTansToMarkdown(String htmlStr) {
         OptionsBuilder optionsBuilder = OptionsBuilder.anOptions();
         Options options = optionsBuilder.withBr("-").withCodeBlockStyle(CodeBlockStyle.FENCED)
@@ -159,7 +192,7 @@ public class GetArticle {
      * @param fileName        图片的文件名
      */
 
-    public static void downloadImage(String imageUrl, String outputDirectory, String fileName) {
+    public static void downloadImage(String imageUrl, String outputDirectory, String fileName) throws InterruptedException {
         try {
             // 创建输出文件路径
             String outputPath = outputDirectory + "/" + fileName;
@@ -168,9 +201,10 @@ public class GetArticle {
             System.out.println("正在下载图片: " + imageUrl);
 
             long size = HttpUtil.downloadFile(imageUrl, FileUtil.file(outputPath));
-
-
             System.out.println("图片下载成功: " + fileName);
+            Thread.sleep(31000);
+
+
         } catch (Exception e) {
             System.err.println("图片下载失败: " + e.getMessage());
         }
