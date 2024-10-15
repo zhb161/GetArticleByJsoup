@@ -7,7 +7,7 @@
     <groupId>com.ice</groupId>
     <artifactId>get-article-from-technical</artifactId>
     <version>1.0</version>
-    <packaging>war</packaging>
+    <packaging>jar</packaging>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
